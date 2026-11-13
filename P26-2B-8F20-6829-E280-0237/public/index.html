@@ -14,11 +14,14 @@
         <span class="brand-mark" aria-hidden="true">9</span>
         <span>Sudoku <span class="brand-detail">· Projeto #4</span></span>
       </a>
-      <div class="discord-badge" id="discordProfile">
-        <a id="discordLoginLink" href="/api/auth/discord">
-          <span id="discordUserText">Entrar com Discord OAuth2</span>
-        </a>
-      </div>
+      <section class="discord-profile" aria-label="Perfil do Discord">
+        <span class="profile-label">Perfil Discord</span>
+        <div class="discord-badge" id="discordProfile">
+          <a id="discordLoginLink" href="/api/auth/discord">
+            <span id="discordUserText">Entrar com Discord OAuth2</span>
+          </a>
+        </div>
+      </section>
     </div>
   </header>
 
@@ -89,6 +92,23 @@
           </section>
         </aside>
       </div>
+
+      <section class="ranking-panel" aria-labelledby="rankingTitle">
+        <div class="ranking-heading">
+          <div>
+            <span class="eyebrow">Comunidade</span>
+            <h2 id="rankingTitle">Ranking</h2>
+          </div>
+          <span class="ranking-tag">Prévia visual</span>
+        </div>
+        <p class="ranking-empty">As pontuações ainda não estão disponíveis nesta versão.</p>
+        <ol class="ranking-list" aria-label="Posições do ranking">
+          <li class="ranking-placeholder">
+            <span class="ranking-placeholder-icon" aria-hidden="true">—</span>
+            <span>Nenhuma pontuação para exibir.</span>
+          </li>
+        </ol>
+      </section>
     </section>
 
     <section class="records-panel" aria-labelledby="recordsTitle">

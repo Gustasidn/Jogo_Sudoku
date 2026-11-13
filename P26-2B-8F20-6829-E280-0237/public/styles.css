@@ -2,6 +2,22 @@
   box-sizing: border-box;
 }
 
+:root {
+  color-scheme: light;
+  --page: #f3f5f9;
+  --surface: #fff;
+  --surface-soft: #f7f9fd;
+  --text: #19243a;
+  --text-muted: #68768c;
+  --accent: #3158b8;
+  --accent-strong: #24499f;
+  --accent-soft: #e8efff;
+  --border: #dfe5ef;
+  --board-line: #c5d0e0;
+  --board-strong-line: #354969;
+  --focus-ring: #7898ed;
+}
+
 /* Regra estrita de tipografia: zero sombras em textos. */
 h1, h2, h3, p, span, label, button, input, select, time, code, strong, a, footer {
   text-shadow: none !important;
@@ -15,8 +31,8 @@ body {
   flex-direction: column;
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-  background: #f3f6fb;
-  color: #17233b;
+  background: var(--page);
+  color: var(--text);
   line-height: 1.5;
 }
 
@@ -29,8 +45,8 @@ button {
 }
 
 .topbar {
-  background: #fff;
-  border-bottom: 1px solid #e1e7f0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 .topbar-inner {
@@ -48,7 +64,7 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  color: #17233b;
+  color: var(--text);
   font-size: 1rem;
   font-weight: 800;
   text-decoration: none;
@@ -60,7 +76,7 @@ button {
   display: grid;
   place-items: center;
   border-radius: 10px;
-  background: #3a66d6;
+  background: var(--accent);
   color: #fff;
   font-size: 1.15rem;
 }
@@ -70,39 +86,73 @@ button {
   font-weight: 600;
 }
 
+.discord-profile {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  min-width: 0;
+  max-width: min(100%, 290px);
+}
+
+.profile-label {
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
 .discord-badge {
   max-width: 100%;
+  overflow: hidden;
   padding: 8px 13px;
   border: 1px solid #cbd9f8;
   border-radius: 999px;
-  background: #f1f5ff;
-  color: #3158b8;
+  background: var(--accent-soft);
+  color: var(--accent);
   font-size: 0.82rem;
   font-weight: 700;
 }
 
 .discord-badge a {
+  display: block;
+  overflow: hidden;
   color: inherit;
   text-decoration: none;
+}
+
+.discord-badge a span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.discord-badge a:focus-visible,
+.brand:focus-visible {
+  border-radius: 4px;
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 4px;
 }
 
 main {
   flex: 1;
   width: min(1120px, 100%);
   margin: 0 auto;
-  padding: 34px 24px 24px;
+  padding: 38px 24px 30px;
 }
 
 .game-shell,
 .records-panel {
-  border: 1px solid #e1e7f0;
-  border-radius: 20px;
-  background: #fff;
-  box-shadow: 0 8px 30px rgba(33, 54, 91, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: 0 12px 36px rgba(33, 54, 91, 0.055);
 }
 
 .game-shell {
-  padding: 28px;
+  padding: 30px;
 }
 
 .game-heading,
@@ -120,7 +170,7 @@ main {
 .eyebrow {
   display: inline-block;
   margin-bottom: 4px;
-  color: #5371b5;
+  color: var(--accent);
   font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 0.1em;
@@ -140,7 +190,7 @@ h1 {
 
 .intro {
   margin-bottom: 0;
-  color: #718097;
+  color: var(--text-muted);
   font-size: 0.92rem;
 }
 
@@ -150,9 +200,9 @@ h1 {
   flex-direction: column;
   align-items: center;
   padding: 8px 14px;
-  border: 1px solid #e2e9f4;
-  border-radius: 13px;
-  background: #f8faff;
+  border: 1px solid #dfe7f8;
+  border-radius: 14px;
+  background: var(--surface-soft);
 }
 
 .timer-label {
@@ -163,7 +213,7 @@ h1 {
 }
 
 .timer-card time {
-  color: #3158b8;
+  color: var(--accent);
   font-size: 1.4rem;
   font-variant-numeric: tabular-nums;
   font-weight: 800;
@@ -177,6 +227,83 @@ h1 {
   gap: 28px;
 }
 
+.ranking-panel {
+  margin-top: 20px;
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface-soft);
+}
+
+.ranking-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.ranking-heading .eyebrow {
+  margin-bottom: 2px;
+}
+
+.ranking-heading h2 {
+  margin-bottom: 0;
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.ranking-tag {
+  flex: none;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
+.ranking-empty {
+  margin-bottom: 12px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.ranking-list {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ranking-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px dashed #d2dbe9;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.ranking-placeholder-icon {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
 .board-panel {
   min-width: 0;
 }
@@ -184,19 +311,20 @@ h1 {
 .board-frame {
   width: min(100%, 590px);
   margin: 0 auto;
-  padding: 6px;
-  border: 1px solid #d5deed;
-  border-radius: 12px;
-  background: #fff;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 5px 16px rgba(33, 54, 91, 0.06);
 }
 
 .sudoku-board {
   display: grid;
   grid-template-columns: repeat(9, minmax(0, 1fr));
   overflow: hidden;
-  border: 2px solid #354969;
-  border-radius: 6px;
-  background: #c5d0e0;
+  border: 2px solid var(--board-strong-line);
+  border-radius: 8px;
+  background: var(--board-line);
   touch-action: manipulation;
 }
 
@@ -212,10 +340,10 @@ h1 {
   place-items: center;
   padding: 0;
   border: 0;
-  border-right: 1px solid #c5d0e0;
-  border-bottom: 1px solid #c5d0e0;
+  border-right: 1px solid var(--board-line);
+  border-bottom: 1px solid var(--board-line);
   border-radius: 0;
-  background: #fff;
+  background: var(--surface);
   color: #3768d2;
   cursor: pointer;
   font-size: clamp(0.9rem, 3.2vw, 1.55rem);
@@ -225,26 +353,26 @@ h1 {
 }
 
 .sudoku-cell.box-right {
-  border-right: 2px solid #354969;
+  border-right: 2px solid var(--board-strong-line);
 }
 
 .sudoku-cell.box-bottom {
-  border-bottom: 2px solid #354969;
+  border-bottom: 2px solid var(--board-strong-line);
 }
 
 .sudoku-cell.is-peer {
-  background: #f1f5fc;
+  background: #f0f3f9;
 }
 
 .sudoku-cell.is-matching {
   background: #e4ecff;
-  color: #244ba7;
+  color: var(--accent-strong);
 }
 
 .sudoku-cell.is-selected {
   z-index: 1;
-  background: #d7e3ff;
-  box-shadow: inset 0 0 0 2px #416dd1;
+  background: #d8e4ff;
+  box-shadow: inset 0 0 0 2px var(--accent);
 }
 
 .sudoku-cell.is-fixed {
@@ -254,7 +382,7 @@ h1 {
 
 .sudoku-cell:focus-visible {
   z-index: 2;
-  outline: 3px solid #173f9f;
+  outline: 3px solid var(--accent-strong);
   outline-offset: -3px;
 }
 
@@ -279,8 +407,8 @@ h1 {
 
 .board-status {
   min-height: 1.5em;
-  margin: 12px 0 3px;
-  color: #3158b8;
+  margin: 14px 0 5px;
+  color: var(--accent-strong);
   font-size: 0.88rem;
   font-weight: 700;
   text-align: center;
@@ -288,7 +416,7 @@ h1 {
 
 .keyboard-hint {
   margin-bottom: 0;
-  color: #8792a3;
+  color: var(--text-muted);
   font-size: 0.72rem;
   text-align: center;
 }
@@ -300,15 +428,15 @@ h1 {
 }
 
 .control-card {
-  padding: 17px;
-  border: 1px solid #e7ebf2;
-  border-radius: 14px;
-  background: #fff;
+  padding: 18px;
+  border: 1px solid #e5e9f1;
+  border-radius: 16px;
+  background: var(--surface);
 }
 
 .control-card h2 {
   margin-bottom: 13px;
-  color: #263650;
+  color: var(--text);
   font-size: 0.94rem;
   font-weight: 800;
 }
@@ -316,7 +444,7 @@ h1 {
 .field-label {
   display: block;
   margin-bottom: 5px;
-  color: #718097;
+  color: var(--text-muted);
   font-size: 0.75rem;
   font-weight: 700;
 }
@@ -325,10 +453,10 @@ h1 {
 .input-text {
   min-width: 0;
   padding: 10px 12px;
-  border: 1px solid #d8e0ec;
-  border-radius: 9px;
-  background: #fff;
-  color: #263650;
+  border: 1px solid #d5deeb;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
   font-size: 0.88rem;
 }
 
@@ -338,14 +466,14 @@ h1 {
 }
 
 .button {
-  min-height: 40px;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   padding: 9px 13px;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: 10px;
   cursor: pointer;
   font-size: 0.84rem;
   font-weight: 750;
@@ -356,18 +484,18 @@ h1 {
 .number-button:focus-visible,
 .control-select:focus-visible,
 .input-text:focus-visible {
-  outline: 3px solid #9bb5f4;
+  outline: 3px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
 .button-primary {
   width: 100%;
-  background: #3a66d6;
+  background: var(--accent);
   color: #fff;
 }
 
 .button-primary:hover {
-  background: #2f56b9;
+  background: var(--accent-strong);
 }
 
 .timer-detail {
@@ -375,7 +503,7 @@ h1 {
   align-items: center;
   gap: 7px;
   margin-top: 12px;
-  color: #7a879a;
+  color: var(--text-muted);
   font-size: 0.73rem;
 }
 
@@ -393,19 +521,25 @@ h1 {
 }
 
 .number-button {
-  min-height: 42px;
-  border: 1px solid #e0e7f1;
-  border-radius: 8px;
-  background: #f8faff;
-  color: #3158b8;
+  min-height: 44px;
+  border: 1px solid #e0e6f0;
+  border-radius: 10px;
+  background: var(--surface-soft);
+  color: var(--accent);
   cursor: pointer;
   font-size: 1.05rem;
   font-weight: 800;
+  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
 }
 
 .number-button:hover {
   border-color: #b7c8f2;
-  background: #edf2ff;
+  background: var(--accent-soft);
+}
+
+.number-button:active,
+.button:active {
+  transform: translateY(1px);
 }
 
 .action-row {
@@ -416,20 +550,20 @@ h1 {
 }
 
 .button-secondary {
-  border-color: #e0e7f1;
-  background: #fff;
-  color: #58677f;
+  border-color: #e0e6f0;
+  background: var(--surface);
+  color: #52617a;
 }
 
 .button-secondary:hover,
 .button-secondary[aria-pressed="true"] {
   border-color: #b7c8f2;
-  background: #edf2ff;
-  color: #3158b8;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .check-card {
-  background: #f8faff;
+  background: var(--surface-soft);
 }
 
 .check-card h2 {
@@ -438,25 +572,26 @@ h1 {
 
 .check-card p {
   margin-bottom: 12px;
-  color: #7a879a;
+  color: var(--text-muted);
   font-size: 0.75rem;
 }
 
 .button-check {
   width: 100%;
   border-color: #d6e0f2;
-  background: #fff;
-  color: #3158b8;
+  background: var(--surface);
+  color: var(--accent);
 }
 
 .button-check:hover {
   border-color: #a9bdea;
-  background: #f0f4ff;
+  background: var(--accent-soft);
 }
 
 .records-panel {
   margin-top: 22px;
   padding: 22px 26px;
+  box-shadow: 0 5px 18px rgba(33, 54, 91, 0.035);
 }
 
 .records-heading {
@@ -465,6 +600,7 @@ h1 {
 
 .records-heading h2 {
   margin-bottom: 0;
+  color: var(--text);
   font-size: 1rem;
   font-weight: 800;
 }
@@ -511,10 +647,10 @@ h1 {
 .records-list li {
   overflow-wrap: anywhere;
   padding: 9px 11px;
-  border: 1px solid #e7ebf2;
+  border: 1px solid #e5e9f1;
   border-radius: 9px;
-  background: #fafbfd;
-  color: #647188;
+  background: var(--surface-soft);
+  color: var(--text-muted);
   font-size: 0.78rem;
 }
 
@@ -535,9 +671,9 @@ footer {
   justify-content: center;
   gap: 7px;
   padding: 18px 24px;
-  border-top: 1px solid #e1e7f0;
-  background: #fff;
-  color: #768297;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
   font-size: 0.75rem;
   font-weight: 650;
   text-align: center;
@@ -551,11 +687,11 @@ footer code {
 
 @media (max-width: 760px) {
   main {
-    padding: 22px 14px;
+    padding: 22px 16px;
   }
 
   .game-shell {
-    padding: 20px 16px;
+    padding: 22px 18px;
   }
 
   .game-layout {
@@ -574,7 +710,11 @@ footer code {
   }
 
   .board-frame {
-    padding: 4px;
+    padding: 5px;
+  }
+
+  .ranking-panel {
+    padding: 18px 20px;
   }
 
   .sudoku-cell {
@@ -611,6 +751,14 @@ footer code {
     font-size: 0.7rem;
   }
 
+  .discord-profile {
+    max-width: 48%;
+  }
+
+  .profile-label {
+    display: none;
+  }
+
   .game-heading {
     align-items: flex-start;
     gap: 8px;
@@ -639,11 +787,15 @@ footer code {
   }
 
   .number-button {
-    min-height: 38px;
+    min-height: 42px;
   }
 
   .records-panel {
     padding: 17px 14px;
+  }
+
+  .ranking-panel {
+    padding: 15px 14px;
   }
 
   .form-row {
@@ -652,5 +804,14 @@ footer code {
 
   .form-row .button-primary {
     width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }
