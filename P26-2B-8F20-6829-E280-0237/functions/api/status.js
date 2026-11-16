@@ -2,39 +2,45 @@
  * Cloudflare Pages Function — /api/status
  * Verifica conectividade com o Cloudflare D1, sessão Discord OAuth2 e permite registrar pings de diagnóstico.
  */
+import { readSession } from "../_lib/session.js";
+
 export async function onRequest(context) {
   const { request, env } = context;
   const chave = "P26-2B-8F20-6829-E280-0237";
   const projectId = 4;
   const projectTitle = "Sudoku com Validador e Cronômetro";
-
-  // Lê sessão real do Discord a partir do cookie HttpOnly se autenticado
-  const cookieHeader = request.headers.get("Cookie") || "";
-  let sessionUser = null;
-  const sessionMatch = cookieHeader.match(/discord_session=([^;]+)/);
-  if (sessionMatch) {
-    try {
-      sessionUser = JSON.parse(decodeURIComponent(atob(sessionMatch[1])));
-    } catch {}
-  }
+  const sessionUser = await readSession(request, env.SESSION_SECRET);
 
   if (request.method === "GET") {
     let dbConnected = false;
     let totalRegistros = 0;
     let ultimosRegistros = [];
+    let d1Error = null;
 
     if (env.DB) {
       try {
-        await env.DB.prepare(
-          "CREATE TABLE IF NOT EXISTS project_records (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, username TEXT NOT NULL, chave_projeto TEXT NOT NULL, conteudo TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"
-        ).run();
-        const countRow = await env.DB.prepare("SELECT COUNT(*) AS total FROM project_records").first();
-        const listRes = await env.DB.prepare("SELECT id, user_id, username, conteudo, created_at FROM project_records ORDER BY id DESC LIMIT 10").all();
+        await env.DB.prepare("SELECT 1").first();
         dbConnected = true;
-        totalRegistros = Number(countRow?.total || 0);
-        ultimosRegistros = listRes.results || [];
       } catch (err) {
-        dbConnected = false;
+        console.error("D1 status check failed.", err);
+        d1Error = "database_unavailable";
+      }
+
+      if (dbConnected && sessionUser) {
+        try {
+          const countRow = await env.DB.prepare(
+            "SELECT COUNT(*) AS total FROM project_records WHERE user_id = ?"
+          ).bind(sessionUser.userId).first();
+          const listRes = await env.DB.prepare(
+            "SELECT id, user_id, username, conteudo, created_at FROM project_records WHERE user_id = ? ORDER BY id DESC LIMIT 10"
+          ).bind(sessionUser.userId).all();
+          totalRegistros = Number(countRow.total);
+          ultimosRegistros = listRes.results || [];
+        } catch (err) {
+          console.error("D1 diagnostic records query failed.", err);
+          dbConnected = false;
+          d1Error = "records_unavailable";
+        }
       }
     }
 
@@ -44,7 +50,10 @@ export async function onRequest(context) {
       projectId,
       projectTitle,
       d1Connected: dbConnected,
-      discordOAuthConfigured: Boolean(env.DISCORD_CLIENT_ID),
+      d1Error,
+      discordOAuthConfigured: Boolean(
+        env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET && env.SESSION_SECRET,
+      ),
       sessionUser,
       totalRegistros,
       ultimosRegistros,
@@ -53,27 +62,39 @@ export async function onRequest(context) {
   }
 
   if (request.method === "POST") {
-    const body = await request.json().catch(() => ({}));
-    const userId = String(body.userId || "discord_demo_user").trim().slice(0, 64);
-    const username = String(body.username || "Estudante").trim().slice(0, 80);
-    const conteudo = String(body.conteudo || "").trim().slice(0, 500);
-
-    if (!conteudo) {
-      return Response.json({ ok: false, error: "Conteúdo obrigatório." }, { status: 400 });
+    if (!sessionUser) {
+      return Response.json({ ok: false, error: "authentication_required" }, { status: 401 });
     }
 
-    if (env.DB) {
-      await env.DB.prepare(
-        "CREATE TABLE IF NOT EXISTS project_records (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, username TEXT NOT NULL, chave_projeto TEXT NOT NULL, conteudo TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"
-      ).run();
+    let body;
+    try {
+      body = await request.json();
+    } catch (err) {
+      return Response.json({ ok: false, error: "invalid_json" }, { status: 400 });
+    }
+
+    const conteudo = body && typeof body.conteudo === "string" ? body.conteudo.trim() : "";
+
+    if (!conteudo || conteudo.length > 500) {
+      return Response.json({ ok: false, error: "invalid_content" }, { status: 400 });
+    }
+
+    if (!env.DB) {
+      return Response.json({ ok: false, error: "database_unavailable" }, { status: 503 });
+    }
+
+    try {
       await env.DB.prepare(
         "INSERT INTO project_records (user_id, username, chave_projeto, conteudo) VALUES (?, ?, ?, ?)"
-      ).bind(userId, username, chave, conteudo).run();
+      ).bind(sessionUser.userId, sessionUser.username, chave, conteudo).run();
+    } catch (err) {
+      console.error("D1 diagnostic record insert failed.", err);
+      return Response.json({ ok: false, error: "record_persistence_failed" }, { status: 503 });
     }
 
     return Response.json({
       ok: true,
-      saved: Boolean(env.DB),
+      saved: true,
       chave,
       serverTimestamp: new Date().toISOString(),
     }, { status: 201 });

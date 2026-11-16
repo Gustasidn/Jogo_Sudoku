@@ -1,18 +1,5 @@
 const CHAVE_PROJETO = "P26-2B-8F20-6829-E280-0237";
-const SOLUTION = "534678912672195348198342567859761423426853791713924856961537284287419635345286179";
-const BASE_PUZZLE = "530070000600195000098000060800060003400803001700020006060000280000419005000080079";
-
-const PUZZLES = {
-  facil: BASE_PUZZLE,
-  medio: "530070000600095000008000060800060003000803001700020006060000280000419000000080079",
-  dificil: "030000000000195000098000060000060003400800001000020000060000280000419005000000079",
-};
-
-const discordSession = {
-  user_id: "discord_" + CHAVE_PROJETO.slice(-4).toLowerCase(),
-  username: "Gustavo",
-  avatar: "https://cdn.discordapp.com/embed/avatars/0.png",
-};
+const ACTIVE_GAME_KEY = "sudoku.activeGame";
 
 const boardElement = document.getElementById("sudokuBoard");
 const timerElement = document.getElementById("gameTimer");
@@ -21,28 +8,93 @@ const difficultyElement = document.getElementById("difficultySelect");
 const notesButton = document.getElementById("notesBtn");
 const cellElements = [];
 
+let sessionUser = null;
 let cells = [];
+let initialBoard = "";
 let selectedIndex = 0;
-let currentSolution = SOLUTION;
 let notesMode = false;
-let gameStartedAt = 0;
+let gameId = null;
+let puzzleId = null;
+let gameStartedAt = null;
+let gameCompleted = false;
 let timerInterval = null;
+
+class ApiError extends Error {
+  constructor(status, code) {
+    super(code || "http_" + status);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code || "http_" + status;
+  }
+}
+
+async function requestJson(url, options) {
+  let response;
+  try {
+    response = await fetch(url, {
+      credentials: "same-origin",
+      ...options,
+    });
+  } catch (error) {
+    throw new Error("Não foi possível conectar à API. Verifique a conexão e tente novamente.");
+  }
+
+  let data;
+  try {
+    data = await response.json();
+  } catch (error) {
+    throw new Error("A API retornou uma resposta inválida.");
+  }
+
+  if (!response.ok || data.ok === false) {
+    throw new ApiError(response.status, data.error);
+  }
+  return data;
+}
 
 const gameService = {
   async start(difficulty) {
-    return {
-      puzzle: PUZZLES[difficulty] || PUZZLES.facil,
-      solution: SOLUTION,
-      source: "local",
-    };
+    return requestJson("/api/sudoku/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ difficulty }),
+    });
+  },
+
+  async loadProgress(activeGameId) {
+    return requestJson("/api/progress?gameId=" + encodeURIComponent(activeGameId));
+  },
+
+  async saveProgress(activeGameId, board, notes) {
+    return requestJson("/api/progress", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ gameId: activeGameId, board, notes }),
+    });
+  },
+
+  async validate(activeGameId, board) {
+    return requestJson("/api/sudoku/validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ gameId: activeGameId, board }),
+    });
+  },
+
+  async ranking(activePuzzleId) {
+    return requestJson("/api/ranking?puzzleId=" + encodeURIComponent(activePuzzleId) + "&limit=10");
   },
 };
 
 function renderDiscordHeader() {
-  const element = document.getElementById("discordUserText");
-  if (element) {
-    element.textContent = "Discord: " + discordSession.username + " (" + discordSession.user_id + ")";
-  }
+  const loginLink = document.getElementById("discordLoginLink");
+  const userText = document.getElementById("discordUserText");
+  const profileLabel = document.getElementById("profileLabel");
+
+  loginLink.hidden = Boolean(sessionUser);
+  userText.hidden = !sessionUser;
+  userText.textContent = sessionUser ? "Discord: " + sessionUser.username : "";
+  profileLabel.textContent = sessionUser ? "Conectado" : "Perfil Discord";
 }
 
 function createBoard() {
@@ -58,9 +110,9 @@ function createBoard() {
       cell.type = "button";
       cell.className = "sudoku-cell";
       cell.setAttribute("role", "gridcell");
+      cell.setAttribute("aria-disabled", "true");
+      cell.disabled = true;
       cell.dataset.index = String(index);
-      cell.dataset.row = String(rowIndex);
-      cell.dataset.column = String(columnIndex);
       cell.tabIndex = index === 0 ? 0 : -1;
 
       if (columnIndex === 2 || columnIndex === 5) {
@@ -76,6 +128,27 @@ function createBoard() {
 
     boardElement.appendChild(row);
   }
+}
+
+function setGameControlsEnabled(enabled) {
+  cellElements.forEach((element) => {
+    element.disabled = !enabled;
+    element.setAttribute("aria-disabled", String(!enabled));
+  });
+
+  [
+    "#saveProgressBtn",
+    "#numberPad button",
+    "#notesBtn",
+    "#eraseBtn",
+    "#checkBtn",
+  ].forEach((selector) => {
+    document.querySelectorAll(selector).forEach((element) => {
+      element.disabled = !enabled;
+    });
+  });
+  document.getElementById("newGameBtn").disabled = !sessionUser;
+  difficultyElement.disabled = !sessionUser || Boolean(gameId && !gameCompleted);
 }
 
 function renderCell(index) {
@@ -121,7 +194,6 @@ function updateHighlights() {
   cellElements.forEach((element, index) => {
     const row = Math.floor(index / 9);
     const column = index % 9;
-    const cellState = cells[index];
     const sameBlock = Math.floor(row / 3) === Math.floor(selectedRow / 3)
       && Math.floor(column / 3) === Math.floor(selectedColumn / 3);
     const sameUnit = row === selectedRow || column === selectedColumn || sameBlock;
@@ -130,7 +202,7 @@ function updateHighlights() {
     element.classList.toggle("is-peer", index !== selectedIndex && sameUnit);
     element.classList.toggle(
       "is-matching",
-      index !== selectedIndex && selectedCell.value > 0 && cellState.value === selectedCell.value,
+      index !== selectedIndex && selectedCell.value > 0 && cells[index].value === selectedCell.value,
     );
     element.setAttribute("aria-selected", String(index === selectedIndex));
     element.tabIndex = index === selectedIndex ? 0 : -1;
@@ -138,28 +210,133 @@ function updateHighlights() {
 }
 
 function selectCell(index, moveFocus) {
-  if (index < 0 || index >= cellElements.length) return;
+  if (index < 0 || index >= cellElements.length || !gameId) return;
   selectedIndex = index;
   updateHighlights();
-  if (moveFocus) {
-    cellElements[selectedIndex].focus();
-  }
+  if (moveFocus) cellElements[selectedIndex].focus();
 }
 
-function finishGame() {
+function serializeBoard() {
+  return cells.map((cell) => String(cell.value)).join("");
+}
+
+function serializeNotes() {
+  const notes = {};
+  cells.forEach((cell, index) => {
+    if (cell.value === 0 && cell.notes.size > 0) {
+      notes[String(index)] = Array.from(cell.notes).sort((left, right) => left - right);
+    }
+  });
+  return notes;
+}
+
+function storeActiveGame() {
+  sessionStorage.setItem(ACTIVE_GAME_KEY, JSON.stringify({
+    gameId,
+    puzzleId,
+    difficulty: difficultyElement.value,
+    startedAt: gameStartedAt,
+    initialBoard,
+  }));
+}
+
+function clearStoredGame() {
+  sessionStorage.removeItem(ACTIVE_GAME_KEY);
+}
+
+function restoreBoard(board, notes) {
+  if (typeof board !== "string" || !/^[0-9]{81}$/.test(board)) {
+    throw new Error("A API retornou um tabuleiro inválido.");
+  }
+  if (!notes || typeof notes !== "object" || Array.isArray(notes)) {
+    throw new Error("A API retornou notas inválidas.");
+  }
+
+  cells = board.split("").map((character, index) => {
+    const value = Number(character);
+    return {
+      value,
+      fixed: initialBoard[index] !== "0",
+      notes: new Set(),
+    };
+  });
+
+  Object.entries(notes).forEach(([key, values]) => {
+    const index = Number(key);
+    if (!Number.isInteger(index) || index < 0 || index > 80 || String(index) !== key || !Array.isArray(values)) {
+      throw new Error("A API retornou notas inválidas.");
+    }
+    if (cells[index].value !== 0 || values.some((value) => !Number.isInteger(value) || value < 1 || value > 9)) {
+      throw new Error("A API retornou notas inválidas.");
+    }
+    cells[index].notes = new Set(values);
+  });
+
+  cells.forEach((cell, index) => renderCell(index));
+  selectedIndex = cells.findIndex((cell) => !cell.fixed);
+  if (selectedIndex < 0) selectedIndex = 0;
+  updateHighlights();
+}
+
+function formatTime(totalSeconds) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return hours.toString().padStart(2, "0") + ":" + minutes.toString().padStart(2, "0") + ":" + seconds.toString().padStart(2, "0");
+  }
+  return minutes.toString().padStart(2, "0") + ":" + seconds.toString().padStart(2, "0");
+}
+
+function updateTimer() {
+  if (!gameStartedAt || gameCompleted) return;
+  const elapsed = Math.max(0, Math.floor((Date.now() - Date.parse(gameStartedAt)) / 1000));
+  timerElement.textContent = formatTime(elapsed);
+  timerElement.dateTime = "PT" + elapsed + "S";
+}
+
+function startTimer() {
+  window.clearInterval(timerInterval);
+  updateTimer();
+  timerInterval = window.setInterval(updateTimer, 1000);
+}
+
+function stopTimer(elapsedSeconds) {
   window.clearInterval(timerInterval);
   timerInterval = null;
-  gameStatusElement.textContent = "Parabéns! Sudoku concluído corretamente.";
+  gameCompleted = true;
+  if (Number.isInteger(elapsedSeconds) && elapsedSeconds >= 0) {
+    timerElement.textContent = formatTime(elapsedSeconds);
+    timerElement.dateTime = "PT" + elapsedSeconds + "S";
+  }
+  setGameControlsEnabled(false);
 }
 
-function checkCompletion() {
-  if (cells.some((cell) => cell.value === 0)) return false;
-  return cells.every((cell, index) => cell.value === Number(currentSolution[index]));
+function formatApiError(error) {
+  const messages = {
+    authentication_required: "Sua sessão Discord expirou. Entre novamente para continuar.",
+    invalid_solution: "O servidor identificou números repetidos em uma linha, coluna ou bloco.",
+    incorrect_solution: "A solução não está correta. Revise as células e tente novamente.",
+    incomplete_board: "Preencha todas as casas antes de verificar a solução.",
+    clues_modified: "Os números iniciais do desafio não podem ser alterados.",
+    game_not_active: "Esta partida não está mais ativa. Inicie uma nova partida.",
+    active_game_not_found: "A partida não está mais ativa.",
+  };
+  return messages[error.code] || "A operação não foi concluída: " + error.message;
+}
+
+function setNotesMode(enabled) {
+  notesMode = enabled;
+  notesButton.setAttribute("aria-pressed", String(notesMode));
+  notesButton.querySelector("span").textContent = notesMode ? "Notas: ativadas" : "Notas";
+  gameStatusElement.textContent = notesMode
+    ? "Modo de notas ativado. Escolha um número para anotar."
+    : "Modo de notas desativado.";
 }
 
 function enterValue(value) {
   const cell = cells[selectedIndex];
-  if (!cell || cell.fixed) return;
+  if (!gameId || gameCompleted || !cell || cell.fixed) return;
 
   if (notesMode) {
     if (cell.value) return;
@@ -175,34 +352,20 @@ function enterValue(value) {
 
   renderCell(selectedIndex);
   updateHighlights();
-
-  if (!notesMode && checkCompletion()) {
-    finishGame();
-  } else {
-    gameStatusElement.textContent = notesMode
-      ? "Nota " + value + (cell.notes.has(value) ? " adicionada." : " removida.") + " · Linha " + (Math.floor(selectedIndex / 9) + 1) + ", coluna " + ((selectedIndex % 9) + 1) + "."
-      : value + " inserido na linha " + (Math.floor(selectedIndex / 9) + 1) + ", coluna " + ((selectedIndex % 9) + 1) + ".";
-  }
+  gameStatusElement.textContent = notesMode
+    ? "Nota " + value + (cell.notes.has(value) ? " adicionada." : " removida.") + " · Linha " + (Math.floor(selectedIndex / 9) + 1) + ", coluna " + ((selectedIndex % 9) + 1) + "."
+    : value + " inserido na linha " + (Math.floor(selectedIndex / 9) + 1) + ", coluna " + ((selectedIndex % 9) + 1) + ".";
 }
 
 function eraseCell() {
   const cell = cells[selectedIndex];
-  if (!cell || cell.fixed) return;
+  if (!gameId || gameCompleted || !cell || cell.fixed) return;
 
   cell.value = 0;
   cell.notes.clear();
   renderCell(selectedIndex);
   updateHighlights();
   gameStatusElement.textContent = "Conteúdo removido da célula selecionada.";
-}
-
-function setNotesMode(enabled) {
-  notesMode = enabled;
-  notesButton.setAttribute("aria-pressed", String(notesMode));
-  notesButton.querySelector("span").textContent = notesMode ? "Notas: ativadas" : "Notas";
-  gameStatusElement.textContent = notesMode
-    ? "Modo de notas ativado. Escolha um número para anotar."
-    : "Modo de notas desativado.";
 }
 
 function moveSelection(rowDelta, columnDelta) {
@@ -213,44 +376,287 @@ function moveSelection(rowDelta, columnDelta) {
   selectCell(nextRow * 9 + nextColumn, true);
 }
 
-function formatTime(totalSeconds) {
-  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
-  const seconds = (totalSeconds % 60).toString().padStart(2, "0");
-  return minutes + ":" + seconds;
-}
+async function loadRanking() {
+  const rankingStatus = document.getElementById("rankingStatus");
+  const rankingList = document.getElementById("rankingList");
+  const rankingTag = document.getElementById("rankingTag");
+  rankingStatus.textContent = "Carregando ranking...";
+  rankingTag.textContent = "Carregando";
 
-function updateTimer() {
-  const elapsed = Math.floor((Date.now() - gameStartedAt) / 1000);
-  timerElement.textContent = formatTime(elapsed);
-  timerElement.dateTime = "PT" + elapsed + "S";
+  try {
+    const data = await gameService.ranking(puzzleId);
+    rankingList.replaceChildren();
+    rankingTag.textContent = "Dificuldade " + data.difficulty;
+
+    if (!Array.isArray(data.entries) || data.entries.length === 0) {
+      rankingStatus.textContent = "Ainda não há resultados para este desafio.";
+      return;
+    }
+
+    rankingStatus.textContent = "Melhores tempos deste desafio.";
+    data.entries.forEach((entry) => {
+      const item = document.createElement("li");
+      item.className = "ranking-placeholder";
+
+      const rank = document.createElement("span");
+      rank.className = "ranking-placeholder-icon";
+      rank.textContent = String(entry.rank);
+
+      const result = document.createElement("span");
+      result.textContent = entry.username + " · " + formatTime(Number(entry.elapsedSeconds));
+
+      item.append(rank, result);
+      rankingList.appendChild(item);
+    });
+  } catch (error) {
+    rankingTag.textContent = "Indisponível";
+    rankingStatus.textContent = "Não foi possível carregar o ranking: " + formatApiError(error);
+  }
 }
 
 async function startGame() {
-  const game = await gameService.start(difficultyElement.value);
-  currentSolution = game.solution;
-  cells = game.puzzle.split("").map((character) => {
-    const value = Number(character);
-    return { value, fixed: value > 0, notes: new Set() };
-  });
+  if (!sessionUser) {
+    gameStatusElement.textContent = "Entre com sua conta Discord antes de iniciar uma partida.";
+    return;
+  }
 
-  cells.forEach((cell, index) => renderCell(index));
-  selectedIndex = cells.findIndex((cell) => !cell.fixed);
-  if (selectedIndex < 0) selectedIndex = 0;
-  updateHighlights();
+  const newGameButton = document.getElementById("newGameBtn");
+  newGameButton.disabled = true;
+  gameStatusElement.textContent = "Solicitando uma nova partida ao servidor...";
+  try {
+    const game = await gameService.start(difficultyElement.value);
+    if (
+      typeof game.gameId !== "string"
+      || typeof game.puzzleId !== "string"
+      || typeof game.board !== "string"
+      || !/^[0-9]{81}$/.test(game.board)
+      || typeof game.startedAt !== "string"
+    ) {
+      throw new Error("A API retornou dados incompletos para a partida.");
+    }
 
+    gameId = game.gameId;
+    puzzleId = game.puzzleId;
+    gameStartedAt = game.startedAt;
+    initialBoard = game.board;
+    gameCompleted = false;
+    difficultyElement.value = game.difficulty;
+    restoreBoard(game.board, {});
+    storeActiveGame();
+    setNotesMode(false);
+    setGameControlsEnabled(true);
+    document.getElementById("gameModeLabel").textContent = "Partida autenticada · " + sessionUser.username;
+    gameStatusElement.textContent = "Partida carregada do servidor. Seu progresso pode ser salvo a qualquer momento.";
+    startTimer();
+    await loadRanking();
+  } catch (error) {
+    setGameControlsEnabled(Boolean(gameId) && !gameCompleted);
+    gameStatusElement.textContent = formatApiError(error);
+  } finally {
+    newGameButton.disabled = !sessionUser;
+  }
+}
+
+async function resumeGame(savedGame) {
+  const progress = await gameService.loadProgress(savedGame.gameId);
+  if (
+    typeof progress.board !== "string"
+    || progress.gameId !== savedGame.gameId
+    || typeof savedGame.puzzleId !== "string"
+    || typeof savedGame.initialBoard !== "string"
+    || !/^[0-9]{81}$/.test(savedGame.initialBoard)
+  ) {
+    throw new Error("Não foi possível restaurar os dados da partida salva.");
+  }
+
+  gameId = savedGame.gameId;
+  puzzleId = savedGame.puzzleId;
+  gameStartedAt = savedGame.startedAt;
+  initialBoard = savedGame.initialBoard;
+  difficultyElement.value = savedGame.difficulty;
+  gameCompleted = false;
+  restoreBoard(progress.board, progress.notes);
   setNotesMode(false);
-  window.clearInterval(timerInterval);
-  gameStartedAt = Date.now();
-  updateTimer();
-  timerInterval = window.setInterval(updateTimer, 1000);
-  gameStatusElement.textContent = "Partida local iniciada. Integração de partidas com a API do backend poderá ser conectada pelo serviço de jogo.";
+  setGameControlsEnabled(true);
+  document.getElementById("gameModeLabel").textContent = "Partida restaurada · " + sessionUser.username;
+  gameStatusElement.textContent = "Progresso recuperado do servidor.";
+  startTimer();
+  await loadRanking();
+}
+
+async function initializeAuthenticatedGame() {
+  const newGameButton = document.getElementById("newGameBtn");
+  newGameButton.disabled = true;
+  try {
+    const savedValue = sessionStorage.getItem(ACTIVE_GAME_KEY);
+    if (savedValue) {
+      let savedGame;
+      try {
+        savedGame = JSON.parse(savedValue);
+      } catch (error) {
+        clearStoredGame();
+        gameStatusElement.textContent = "O estado local da partida estava inválido; será iniciada uma nova partida.";
+      }
+
+      if (savedGame) {
+        try {
+          await resumeGame(savedGame);
+          return;
+        } catch (error) {
+          if (!(error instanceof ApiError) || error.status !== 404) {
+            throw error;
+          }
+          clearStoredGame();
+        }
+      }
+    }
+    await startGame();
+  } catch (error) {
+    gameStatusElement.textContent = formatApiError(error);
+    setGameControlsEnabled(false);
+  }
+}
+
+function renderRecords(data) {
+  const listElement = document.getElementById("recordsList");
+  const items = Array.isArray(data.ultimosRegistros) ? data.ultimosRegistros : [];
+  listElement.replaceChildren();
+  if (items.length === 0) {
+    const item = document.createElement("li");
+    item.textContent = data.sessionUser
+      ? "API Online (" + (data.d1Connected ? "D1 conectado" : "modo diagnóstico") + "). Nenhum registro gravado ainda."
+      : "Entre com o Discord para consultar os registros da sua conta.";
+    listElement.appendChild(item);
+    return;
+  }
+
+  items.forEach((record) => {
+    const item = document.createElement("li");
+    item.textContent = "[" + (record.created_at || "agora") + "] " + record.username + ": " + record.conteudo;
+    listElement.appendChild(item);
+  });
+}
+
+async function loadDiagnostics() {
+  const listElement = document.getElementById("recordsList");
+  try {
+    const data = await requestJson("/api/status");
+    renderRecords(data);
+    return data;
+  } catch (error) {
+    const item = document.createElement("li");
+    item.textContent = "API de diagnóstico indisponível: " + formatApiError(error);
+    listElement.replaceChildren(item);
+    throw error;
+  }
+}
+
+async function loadSession() {
+  setGameControlsEnabled(false);
+  try {
+    const data = await loadDiagnostics();
+    sessionUser = data.sessionUser || null;
+    renderDiscordHeader();
+
+    if (!sessionUser || typeof sessionUser.userId !== "string" || typeof sessionUser.username !== "string") {
+      sessionUser = null;
+      renderDiscordHeader();
+      document.getElementById("gameModeLabel").textContent = "Aguardando autenticação Discord";
+      gameStatusElement.textContent = "Entre com sua conta Discord para iniciar e salvar uma partida.";
+      return;
+    }
+
+    document.getElementById("gameModeLabel").textContent = "Conta Discord autenticada";
+    await initializeAuthenticatedGame();
+  } catch (error) {
+    sessionUser = null;
+    renderDiscordHeader();
+    document.getElementById("gameModeLabel").textContent = "Autenticação indisponível";
+    gameStatusElement.textContent = "Não foi possível confirmar sua sessão: " + formatApiError(error);
+  }
+}
+
+function isBoardComplete() {
+  return cells.length === 81 && cells.every((cell) => cell.value > 0);
+}
+
+async function saveProgress() {
+  if (!sessionUser || !gameId || gameCompleted) return;
+
+  const saveButton = document.getElementById("saveProgressBtn");
+  saveButton.disabled = true;
+  gameStatusElement.textContent = "Salvando progresso no servidor...";
+  try {
+    await gameService.saveProgress(gameId, serializeBoard(), serializeNotes());
+    storeActiveGame();
+    gameStatusElement.textContent = "Progresso salvo no servidor.";
+  } catch (error) {
+    gameStatusElement.textContent = formatApiError(error);
+  } finally {
+    saveButton.disabled = !gameId || gameCompleted;
+  }
+}
+
+async function validateGame() {
+  if (!sessionUser || !gameId || gameCompleted) return;
+  if (!isBoardComplete()) {
+    gameStatusElement.textContent = "Preencha todas as casas antes de enviar a solução ao servidor.";
+    return;
+  }
+
+  const checkButton = document.getElementById("checkBtn");
+  checkButton.disabled = true;
+  gameStatusElement.textContent = "Enviando a solução para validação no servidor...";
+  try {
+    const result = await gameService.validate(gameId, serializeBoard());
+    if (result.completed !== true) {
+      throw new Error("O servidor não confirmou a conclusão da partida.");
+    }
+
+    const elapsedSeconds = Number(result.elapsedSeconds);
+    if (!Number.isInteger(elapsedSeconds) || elapsedSeconds < 0) {
+      throw new Error("O servidor retornou um tempo de conclusão inválido.");
+    }
+
+    stopTimer(elapsedSeconds);
+    clearStoredGame();
+    gameStatusElement.textContent = "Sudoku validado pelo servidor. Tempo oficial: " + formatTime(elapsedSeconds) + ".";
+    await loadRanking();
+  } catch (error) {
+    gameStatusElement.textContent = formatApiError(error);
+  } finally {
+    checkButton.disabled = !gameId || gameCompleted;
+  }
+}
+
+async function sendDiagnosticRecord() {
+  const input = document.getElementById("recordInput");
+  const statusElement = document.getElementById("statusMessage");
+  const content = input.value.trim();
+  if (!content) {
+    statusElement.textContent = "Digite um conteúdo antes de registrar.";
+    input.focus();
+    return;
+  }
+
+  statusElement.textContent = "Enviando para Cloudflare Function...";
+  try {
+    await requestJson("/api/status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conteudo: content }),
+    });
+    input.value = "";
+    statusElement.textContent = "Registro processado na Cloudflare Function.";
+    await loadDiagnostics();
+  } catch (error) {
+    statusElement.textContent = formatApiError(error);
+  }
 }
 
 function handleBoardKeydown(event) {
   if (event.altKey || event.ctrlKey || event.metaKey) return;
-
-  const isBoardCell = event.target instanceof Element && event.target.closest(".sudoku-cell");
-  if (!isBoardCell) return;
+  if (!(event.target instanceof Element) || !event.target.closest(".sudoku-cell")) return;
 
   const movement = {
     ArrowUp: [-1, 0],
@@ -266,7 +672,7 @@ function handleBoardKeydown(event) {
 }
 
 function handleDocumentKeydown(event) {
-  if (event.altKey || event.ctrlKey || event.metaKey) return;
+  if (event.altKey || event.ctrlKey || event.metaKey || !gameId || gameCompleted) return;
   const target = event.target;
   if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return;
 
@@ -280,83 +686,12 @@ function handleDocumentKeydown(event) {
   }
 }
 
-async function carregarStatus() {
-  const listElement = document.getElementById("recordsList");
-  try {
-    const response = await fetch("/api/status");
-    if (!response.ok) {
-      throw new Error("A API respondeu com o status " + response.status + ".");
-    }
-
-    const data = await response.json();
-    listElement.replaceChildren();
-    if (data.sessionUser) {
-      discordSession.user_id = data.sessionUser.userId;
-      discordSession.username = data.sessionUser.username;
-      discordSession.avatar = data.sessionUser.avatar || discordSession.avatar;
-      renderDiscordHeader();
-    }
-
-    const items = Array.isArray(data.ultimosRegistros) ? data.ultimosRegistros : [];
-    if (items.length === 0) {
-      const item = document.createElement("li");
-      item.textContent = "API Online (" + (data.d1Connected ? "D1 conectado" : "modo diagnóstico") + "). Nenhum registro gravado ainda.";
-      listElement.appendChild(item);
-      return;
-    }
-
-    items.forEach((record) => {
-      const item = document.createElement("li");
-      item.textContent = "[" + (record.created_at || "agora") + "] " + record.username + " (" + record.user_id + "): " + record.conteudo;
-      listElement.appendChild(item);
-    });
-  } catch (error) {
-    const item = document.createElement("li");
-    item.textContent = "API de diagnóstico indisponível: " + error.message;
-    listElement.replaceChildren(item);
-  }
-}
-
-async function enviarRegistro() {
-  const input = document.getElementById("recordInput");
-  const statusElement = document.getElementById("statusMessage");
-  const content = input.value.trim();
-  if (!content) {
-    statusElement.textContent = "Digite um conteúdo antes de registrar.";
-    input.focus();
-    return;
-  }
-
-  statusElement.textContent = "Enviando para Cloudflare Function...";
-  try {
-    const response = await fetch("/api/status", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: discordSession.user_id,
-        username: discordSession.username,
-        conteudo: content,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error("A API respondeu com o status " + response.status + ".");
-    }
-
-    input.value = "";
-    statusElement.textContent = "Registro processado na Cloudflare Function.";
-    await carregarStatus();
-  } catch (error) {
-    statusElement.textContent = "Não foi possível registrar: " + error.message;
-  }
-}
-
 createBoard();
+setGameControlsEnabled(false);
+
 boardElement.addEventListener("click", (event) => {
   const cellElement = event.target.closest(".sudoku-cell");
-  if (cellElement) {
-    selectCell(Number(cellElement.dataset.index), false);
-  }
+  if (cellElement) selectCell(Number(cellElement.dataset.index), false);
 });
 boardElement.addEventListener("keydown", handleBoardKeydown);
 document.addEventListener("keydown", handleDocumentKeydown);
@@ -366,19 +701,11 @@ document.getElementById("numberPad").addEventListener("click", (event) => {
   if (button) enterValue(Number(button.dataset.number));
 });
 document.getElementById("eraseBtn").addEventListener("click", eraseCell);
-document.getElementById("checkBtn").addEventListener("click", () => {
-  if (cells.some((cell) => cell.value === 0)) {
-    gameStatusElement.textContent = "Ainda há células vazias. Continue preenchendo o tabuleiro.";
-  } else if (checkCompletion()) {
-    finishGame();
-  } else {
-    gameStatusElement.textContent = "Ainda há números incorretos. Revise as células preenchidas.";
-  }
-});
+document.getElementById("checkBtn").addEventListener("click", validateGame);
+document.getElementById("saveProgressBtn").addEventListener("click", saveProgress);
 notesButton.addEventListener("click", () => setNotesMode(!notesMode));
 document.getElementById("newGameBtn").addEventListener("click", startGame);
-document.getElementById("sendBtn").addEventListener("click", enviarRegistro);
+document.getElementById("sendBtn").addEventListener("click", sendDiagnosticRecord);
 
 renderDiscordHeader();
-startGame();
-carregarStatus();
+loadSession();

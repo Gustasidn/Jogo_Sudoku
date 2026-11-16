@@ -15,11 +15,12 @@
         <span>Sudoku <span class="brand-detail">· Projeto #4</span></span>
       </a>
       <section class="discord-profile" aria-label="Perfil do Discord">
-        <span class="profile-label">Perfil Discord</span>
+        <span class="profile-label" id="profileLabel">Perfil Discord</span>
         <div class="discord-badge" id="discordProfile">
           <a id="discordLoginLink" href="/api/auth/discord">
-            <span id="discordUserText">Entrar com Discord OAuth2</span>
+            <span>Entrar com Discord OAuth2</span>
           </a>
+          <span id="discordUserText" hidden></span>
         </div>
       </section>
     </div>
@@ -60,9 +61,10 @@
               <option value="dificil">Difícil</option>
             </select>
             <button class="button button-primary" id="newGameBtn" type="button">Novo jogo</button>
+            <button class="button button-secondary save-progress-button" id="saveProgressBtn" type="button">Salvar progresso</button>
             <div class="timer-detail">
               <span class="status-dot" aria-hidden="true"></span>
-              <span id="gameModeLabel">Partida local</span>
+              <span id="gameModeLabel">Aguardando autenticação Discord</span>
             </div>
           </section>
 
@@ -99,13 +101,13 @@
             <span class="eyebrow">Comunidade</span>
             <h2 id="rankingTitle">Ranking</h2>
           </div>
-          <span class="ranking-tag">Prévia visual</span>
+          <span class="ranking-tag" id="rankingTag">Aguardando partida</span>
         </div>
-        <p class="ranking-empty">As pontuações ainda não estão disponíveis nesta versão.</p>
-        <ol class="ranking-list" aria-label="Posições do ranking">
+        <p class="ranking-empty" id="rankingStatus" role="status" aria-live="polite">O ranking será carregado ao iniciar uma partida.</p>
+        <ol class="ranking-list" id="rankingList" aria-label="Posições do ranking" aria-live="polite">
           <li class="ranking-placeholder">
             <span class="ranking-placeholder-icon" aria-hidden="true">—</span>
-            <span>Nenhuma pontuação para exibir.</span>
+            <span>Inicie uma partida para consultar os melhores tempos.</span>
           </li>
         </ol>
       </section>

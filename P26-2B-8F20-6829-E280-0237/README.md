@@ -46,5 +46,17 @@ Ao iniciar uma partida, uma Cloudflare Function registra o carimbo de tempo inic
      - Adicione as variáveis de ambiente:
        - `DISCORD_CLIENT_ID`
        - `DISCORD_CLIENT_SECRET`
+       - `SESSION_SECRET` como secret, contendo pelo menos 32 bytes aleatórios para assinar os cookies de sessão.
 6. Atualize o campo **URL_CLOUDFLARE** no topo deste `README.md` com o endereço público gerado pela Cloudflare.
 7. Na raiz do repositório, execute `node validar-local.mjs P26-2B-8F20-6829-E280-0237` para validar todos os critérios antes de fazer o commit e abrir o Pull Request.
+
+## Contratos das APIs de jogo
+
+- `POST /api/sudoku/start` recebe `{ "difficulty": "facil" | "medio" | "dificil" }` e retorna a partida e o tabuleiro inicial, sem enviar a solução.
+- `GET /api/progress?gameId=...` recupera o progresso da partida autenticada.
+- `PUT /api/progress` recebe `{ "gameId": "...", "board": "<81 dígitos de 0 a 9>", "notes": { "2": [1, 2] } }`, com índices de casas entre `0` e `80`.
+- `POST /api/sudoku/validate` recebe `{ "gameId": "...", "board": "<81 dígitos de 1 a 9>" }`; o servidor verifica a solução, registra o tempo e conclui a partida.
+- `GET /api/ranking?puzzleId=facil-1&limit=10` retorna os melhores tempos daquele puzzle.
+- `POST /api/auth/logout` encerra a sessão.
+
+As rotas de partida e progresso exigem uma sessão Discord válida. O identificador do usuário é obtido do cookie assinado, nunca do payload do cliente. O ranking é público e ordenado por tempo crescente, horário de conclusão e identificador da partida.
