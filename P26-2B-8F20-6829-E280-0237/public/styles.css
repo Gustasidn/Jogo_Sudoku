@@ -808,6 +808,12 @@ footer code {
   }
 }
 
+@media (max-width: 320px) {
+  body {
+    min-width: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
