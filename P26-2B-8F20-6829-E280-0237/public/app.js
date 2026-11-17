@@ -84,16 +84,24 @@ const gameService = {
   async ranking(activePuzzleId) {
     return requestJson("/api/ranking?puzzleId=" + encodeURIComponent(activePuzzleId) + "&limit=10");
   },
+
+  async logout() {
+    return requestJson("/api/auth/logout", { method: "POST" });
+  },
 };
 
 function renderDiscordHeader() {
   const loginLink = document.getElementById("discordLoginLink");
   const userText = document.getElementById("discordUserText");
   const profileLabel = document.getElementById("profileLabel");
+  const logoutButton = document.getElementById("logoutButton");
 
   loginLink.hidden = Boolean(sessionUser);
   userText.hidden = !sessionUser;
   userText.textContent = sessionUser ? "Discord: " + sessionUser.username : "";
+  logoutButton.hidden = !sessionUser;
+  logoutButton.disabled = false;
+  logoutButton.textContent = "Sair da Conta";
   profileLabel.textContent = sessionUser ? "Conectado" : "Perfil Discord";
 }
 
@@ -654,6 +662,68 @@ async function sendDiagnosticRecord() {
   }
 }
 
+function resetGameAfterLogout() {
+  window.clearInterval(timerInterval);
+  timerInterval = null;
+  gameId = null;
+  puzzleId = null;
+  gameStartedAt = null;
+  initialBoard = "";
+  gameCompleted = false;
+  selectedIndex = 0;
+  notesMode = false;
+  cells = Array.from({ length: 81 }, () => ({ value: 0, fixed: false, notes: new Set() }));
+  cells.forEach((cell, index) => renderCell(index));
+  updateHighlights();
+  timerElement.textContent = "00:00";
+  timerElement.dateTime = "PT0S";
+  notesButton.setAttribute("aria-pressed", "false");
+  notesButton.querySelector("span").textContent = "Notas";
+  setGameControlsEnabled(false);
+  clearStoredGame();
+
+  const rankingList = document.getElementById("rankingList");
+  rankingList.replaceChildren();
+  const placeholder = document.createElement("li");
+  placeholder.className = "ranking-placeholder";
+  const icon = document.createElement("span");
+  icon.className = "ranking-placeholder-icon";
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent = "—";
+  const message = document.createElement("span");
+  message.textContent = "Entre com o Discord para iniciar uma partida.";
+  placeholder.append(icon, message);
+  rankingList.appendChild(placeholder);
+  document.getElementById("rankingTag").textContent = "Aguardando partida";
+  document.getElementById("rankingStatus").textContent = "O ranking será carregado ao iniciar uma partida.";
+}
+
+async function logout() {
+  const button = document.getElementById("logoutButton");
+  if (!sessionUser || button.disabled) return;
+
+  button.disabled = true;
+  button.textContent = "Saindo...";
+  gameStatusElement.textContent = "Encerrando sessão Discord...";
+  try {
+    await gameService.logout();
+    sessionUser = null;
+    renderDiscordHeader();
+    resetGameAfterLogout();
+    document.getElementById("gameModeLabel").textContent = "Aguardando autenticação Discord";
+    gameStatusElement.textContent = "Você saiu da sua conta Discord.";
+    try {
+      await loadDiagnostics();
+    } catch (error) {
+      document.getElementById("statusMessage").textContent = "Sessão encerrada; não foi possível atualizar o diagnóstico.";
+    }
+  } catch (error) {
+    gameStatusElement.textContent = "Não foi possível encerrar a sessão: " + formatApiError(error);
+    button.disabled = false;
+    button.textContent = "Sair da Conta";
+  }
+}
+
 function handleBoardKeydown(event) {
   if (event.altKey || event.ctrlKey || event.metaKey) return;
   if (!(event.target instanceof Element) || !event.target.closest(".sudoku-cell")) return;
@@ -706,6 +776,7 @@ document.getElementById("saveProgressBtn").addEventListener("click", saveProgres
 notesButton.addEventListener("click", () => setNotesMode(!notesMode));
 document.getElementById("newGameBtn").addEventListener("click", startGame);
 document.getElementById("sendBtn").addEventListener("click", sendDiagnosticRecord);
+document.getElementById("logoutButton").addEventListener("click", logout);
 
 renderDiscordHeader();
 loadSession();

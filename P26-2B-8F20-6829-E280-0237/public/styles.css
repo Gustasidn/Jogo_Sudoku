@@ -103,6 +103,15 @@ button {
   text-transform: uppercase;
 }
 
+.discord-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .discord-badge {
   max-width: 100%;
   overflow: hidden;
@@ -124,6 +133,34 @@ button {
 
 .discord-badge [hidden] {
   display: none;
+}
+
+.logout-button {
+  flex: none;
+  padding: 8px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.logout-button:hover {
+  border-color: #e7b5b5;
+  background: #fff7f7;
+  color: #a33b3b;
+}
+
+.logout-button:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.logout-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .discord-badge a span {
@@ -773,11 +810,20 @@ footer code {
   }
 
   .discord-profile {
-    max-width: 48%;
+    max-width: 64%;
   }
 
   .profile-label {
     display: none;
+  }
+
+  .discord-actions {
+    gap: 5px;
+  }
+
+  .logout-button {
+    padding: 7px 8px;
+    font-size: 0.68rem;
   }
 
   .game-heading {

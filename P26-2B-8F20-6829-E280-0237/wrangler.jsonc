@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "projeto-p26-2b-8f20-6829-e280-0237",
+  "name": "jogo-sudoku",
   "compatibility_date": "2026-03-01",
   "pages_build_output_dir": "./public",
   "d1_databases": [

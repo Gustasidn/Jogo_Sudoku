@@ -40,7 +40,7 @@ Ao iniciar uma partida, uma Cloudflare Function registra o carimbo de tempo inic
    - Na aba **OAuth2**:
      - Copie o **Client ID** e gere o **Client Secret**.
      - Em **Redirects**, adicione a URL exata do deploy:
-       `https://p26-2b-8f20-6829-e280-0237.pages.dev/api/auth/discord/callback`
+       `https://jogo-sudoku.pages.dev/api/auth/discord/callback`
    - No painel do seu projeto no Cloudflare Pages:
      - Acesse **Settings** → **Environment variables**.
      - Adicione as variáveis de ambiente:

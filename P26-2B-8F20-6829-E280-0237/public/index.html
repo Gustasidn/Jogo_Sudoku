@@ -16,11 +16,14 @@
       </a>
       <section class="discord-profile" aria-label="Perfil do Discord">
         <span class="profile-label" id="profileLabel">Perfil Discord</span>
-        <div class="discord-badge" id="discordProfile">
-          <a id="discordLoginLink" href="/api/auth/discord">
-            <span>Entrar com Discord OAuth2</span>
-          </a>
-          <span id="discordUserText" hidden></span>
+        <div class="discord-actions">
+          <div class="discord-badge" id="discordProfile">
+            <a id="discordLoginLink" href="/api/auth/discord">
+              <span>Entrar com Discord OAuth2</span>
+            </a>
+            <span id="discordUserText" hidden></span>
+          </div>
+          <button class="logout-button" id="logoutButton" type="button" hidden>Sair da Conta</button>
         </div>
       </section>
     </div>
