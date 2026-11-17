@@ -4,7 +4,7 @@
 - **Estudante:** Gustavo Henrique Igerski das Neves
 - **Turma:** 2B
 - **Chave Única:** `P26-2B-8F20-6829-E280-0237`
-- **URL_CLOUDFLARE:** `https://p26-2b-8f20-6829-e280-0237.pages.dev` *(Atualize com a URL pública real do seu deploy na Cloudflare antes de abrir o Pull Request)*
+- **URL_CLOUDFLARE:** `https://jogo-sudoku.pages.dev` *(Atualize com a URL pública real do seu deploy na Cloudflare antes de abrir o Pull Request)*
 
 ---
 
