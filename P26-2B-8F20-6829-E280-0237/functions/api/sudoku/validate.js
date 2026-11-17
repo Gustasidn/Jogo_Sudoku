@@ -3,7 +3,10 @@ import {
   readJsonBody,
   requireSession,
 } from "../../_lib/api.js";
-import { validateSolvedBoard } from "../../_lib/sudoku.js";
+import {
+  MIN_GAME_DURATION_SECONDS,
+  validateSolvedBoard,
+} from "../../_lib/sudoku.js";
 
 async function findExistingResult(db, gameId) {
   return db.prepare(
@@ -67,11 +70,20 @@ export async function onRequestPost(context) {
   }
 
   const startedAt = Date.parse(game.started_at);
-  const completedAt = new Date().toISOString();
-  const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
-  if (!Number.isFinite(startedAt) || elapsedSeconds < 0) {
+  const completedAtMilliseconds = Date.now();
+  const elapsedMilliseconds = completedAtMilliseconds - startedAt;
+  if (!Number.isFinite(startedAt) || elapsedMilliseconds < 0) {
     return Response.json({ ok: false, error: "invalid_game_start_time" }, { status: 500 });
   }
+  if (elapsedMilliseconds < MIN_GAME_DURATION_SECONDS * 1000) {
+    return Response.json({
+      ok: false,
+      error: "game_too_fast",
+      minimumDurationSeconds: MIN_GAME_DURATION_SECONDS,
+    }, { status: 422 });
+  }
+  const completedAt = new Date(completedAtMilliseconds).toISOString();
+  const elapsedSeconds = Math.floor(elapsedMilliseconds / 1000);
 
   let batchResults;
   try {

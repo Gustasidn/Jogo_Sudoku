@@ -1,4 +1,5 @@
 import { methodNotAllowed } from "../_lib/api.js";
+import { MIN_GAME_DURATION_SECONDS } from "../_lib/sudoku.js";
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -26,8 +27,8 @@ export async function onRequestGet(context) {
     }
 
     const result = await env.DB.prepare(
-      "SELECT r.username_snapshot AS username, r.elapsed_seconds AS elapsedSeconds, r.completed_at AS completedAt FROM sudoku_results r JOIN sudoku_games g ON g.game_id = r.game_id WHERE g.puzzle_id = ? AND g.status = 'completed' ORDER BY r.elapsed_seconds ASC, r.completed_at ASC, r.game_id ASC LIMIT ?"
-    ).bind(puzzleId, limit).all();
+      "SELECT r.username_snapshot AS username, r.elapsed_seconds AS elapsedSeconds, r.completed_at AS completedAt FROM sudoku_results r JOIN sudoku_games g ON g.game_id = r.game_id WHERE g.puzzle_id = ? AND g.status = 'completed' AND r.elapsed_seconds >= ? ORDER BY r.elapsed_seconds ASC, r.completed_at ASC, r.game_id ASC LIMIT ?"
+    ).bind(puzzleId, MIN_GAME_DURATION_SECONDS, limit).all();
     const entries = (result.results || []).map((entry, index) => ({
       rank: index + 1,
       username: entry.username,

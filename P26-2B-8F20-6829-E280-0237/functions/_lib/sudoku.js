@@ -1,3 +1,5 @@
+export const MIN_GAME_DURATION_SECONDS = 30;
+
 export function validateProgressBoard(board, puzzle) {
   if (typeof board !== "string" || !/^[0-9]{81}$/.test(board)) {
     return "invalid_board";
