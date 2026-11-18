@@ -1,5 +1,6 @@
 const CHAVE_PROJETO = "P26-2B-8F20-6829-E280-0237";
 const ACTIVE_GAME_KEY = "sudoku.activeGame";
+const ACTIVE_DIFFICULTY_KEY = "sudoku.selectedDifficulty";
 
 const boardElement = document.getElementById("sudokuBoard");
 const timerElement = document.getElementById("gameTimer");
@@ -18,6 +19,37 @@ let puzzleId = null;
 let gameStartedAt = null;
 let gameCompleted = false;
 let timerInterval = null;
+const regionHighlightTimeouts = new Map();
+const activeRegionHighlights = new Map();
+
+function createRegions() {
+  const regions = [];
+  for (let group = 0; group < 9; group += 1) {
+    regions.push({
+      id: "row-" + group,
+      label: "Linha " + (group + 1),
+      indices: Array.from({ length: 9 }, (_, offset) => group * 9 + offset),
+    });
+    regions.push({
+      id: "column-" + group,
+      label: "Coluna " + (group + 1),
+      indices: Array.from({ length: 9 }, (_, offset) => offset * 9 + group),
+    });
+
+    const boxRow = Math.floor(group / 3) * 3;
+    const boxColumn = (group % 3) * 3;
+    const indices = [];
+    for (let row = boxRow; row < boxRow + 3; row += 1) {
+      for (let column = boxColumn; column < boxColumn + 3; column += 1) {
+        indices.push(row * 9 + column);
+      }
+    }
+    regions.push({ id: "box-" + group, label: "Bloco " + (group + 1), indices });
+  }
+  return regions;
+}
+
+const REGIONS = createRegions();
 
 class ApiError extends Error {
   constructor(status, code) {
@@ -139,6 +171,7 @@ function createBoard() {
 }
 
 function setGameControlsEnabled(enabled) {
+  document.body.classList.toggle("has-active-game", enabled && Boolean(gameId) && !gameCompleted);
   cellElements.forEach((element) => {
     element.disabled = !enabled;
     element.setAttribute("aria-disabled", String(!enabled));
@@ -156,7 +189,7 @@ function setGameControlsEnabled(enabled) {
     });
   });
   document.getElementById("newGameBtn").disabled = !sessionUser;
-  difficultyElement.disabled = !sessionUser || Boolean(gameId && !gameCompleted);
+  difficultyElement.disabled = Boolean(gameId && !gameCompleted);
 }
 
 function renderCell(index) {
@@ -198,6 +231,7 @@ function updateHighlights() {
   const selectedRow = Math.floor(selectedIndex / 9);
   const selectedColumn = selectedIndex % 9;
   const selectedCell = cells[selectedIndex];
+  const conflictingCells = findConflictingCells();
 
   cellElements.forEach((element, index) => {
     const row = Math.floor(index / 9);
@@ -212,9 +246,84 @@ function updateHighlights() {
       "is-matching",
       index !== selectedIndex && selectedCell.value > 0 && cells[index].value === selectedCell.value,
     );
+    element.classList.toggle("is-error", conflictingCells.has(index));
     element.setAttribute("aria-selected", String(index === selectedIndex));
+    element.setAttribute("aria-invalid", String(conflictingCells.has(index)));
     element.tabIndex = index === selectedIndex ? 0 : -1;
   });
+}
+
+function findConflictingCells() {
+  const conflicts = new Set();
+  for (let index = 0; index < cells.length; index += 1) {
+    const value = cells[index].value;
+    if (value === 0) continue;
+
+    const row = Math.floor(index / 9);
+    const column = index % 9;
+    for (let otherIndex = index + 1; otherIndex < cells.length; otherIndex += 1) {
+      if (cells[otherIndex].value !== value) continue;
+      const otherRow = Math.floor(otherIndex / 9);
+      const otherColumn = otherIndex % 9;
+      const sharesRegion = row === otherRow
+        || column === otherColumn
+        || (Math.floor(row / 3) === Math.floor(otherRow / 3)
+          && Math.floor(column / 3) === Math.floor(otherColumn / 3));
+      if (!sharesRegion) continue;
+      if (!cells[index].fixed) conflicts.add(index);
+      if (!cells[otherIndex].fixed) conflicts.add(otherIndex);
+    }
+  }
+  return conflicts;
+}
+
+function getCompletedRegions() {
+  const completed = new Set();
+  REGIONS.forEach((region) => {
+    const values = region.indices.map((index) => cells[index].value);
+    if (values.every((value) => value > 0) && new Set(values).size === 9) {
+      completed.add(region.id);
+    }
+  });
+  return completed;
+}
+
+function updateRegionHighlights() {
+  const highlightedCells = new Set();
+  activeRegionHighlights.forEach((indices) => {
+    indices.forEach((index) => highlightedCells.add(index));
+  });
+  cellElements.forEach((element, index) => {
+    element.classList.toggle("is-region-complete", highlightedCells.has(index));
+  });
+}
+
+function clearRegionHighlights() {
+  regionHighlightTimeouts.forEach((timeout) => window.clearTimeout(timeout));
+  regionHighlightTimeouts.clear();
+  activeRegionHighlights.clear();
+  updateRegionHighlights();
+}
+
+function highlightNewlyCompletedRegions(previouslyCompleted) {
+  const completedRegions = getCompletedRegions();
+  const newlyCompleted = REGIONS.filter((region) => (
+    !previouslyCompleted.has(region.id) && completedRegions.has(region.id)
+  ));
+
+  newlyCompleted.forEach((region) => {
+    window.clearTimeout(regionHighlightTimeouts.get(region.id));
+    activeRegionHighlights.set(region.id, region.indices);
+    const timeout = window.setTimeout(() => {
+      activeRegionHighlights.delete(region.id);
+      regionHighlightTimeouts.delete(region.id);
+      updateRegionHighlights();
+    }, 1700);
+    regionHighlightTimeouts.set(region.id, timeout);
+  });
+
+  if (newlyCompleted.length > 0) updateRegionHighlights();
+  return newlyCompleted.map((region) => region.label);
 }
 
 function selectCell(index, moveFocus) {
@@ -246,6 +355,17 @@ function storeActiveGame() {
     startedAt: gameStartedAt,
     initialBoard,
   }));
+}
+
+function restoreSelectedDifficulty() {
+  const savedDifficulty = sessionStorage.getItem(ACTIVE_DIFFICULTY_KEY);
+  if (["facil", "medio", "dificil"].includes(savedDifficulty)) {
+    difficultyElement.value = savedDifficulty;
+  }
+}
+
+function storeSelectedDifficulty() {
+  sessionStorage.setItem(ACTIVE_DIFFICULTY_KEY, difficultyElement.value);
 }
 
 function clearStoredGame() {
@@ -346,6 +466,7 @@ function enterValue(value) {
   const cell = cells[selectedIndex];
   if (!gameId || gameCompleted || !cell || cell.fixed) return;
 
+  const completedBeforeInput = notesMode ? null : getCompletedRegions();
   if (notesMode) {
     if (cell.value) return;
     if (cell.notes.has(value)) {
@@ -360,8 +481,15 @@ function enterValue(value) {
 
   renderCell(selectedIndex);
   updateHighlights();
-  gameStatusElement.textContent = notesMode
-    ? "Nota " + value + (cell.notes.has(value) ? " adicionada." : " removida.") + " · Linha " + (Math.floor(selectedIndex / 9) + 1) + ", coluna " + ((selectedIndex % 9) + 1) + "."
+  if (notesMode) {
+    gameStatusElement.textContent = "Nota " + value + (cell.notes.has(value) ? " adicionada." : " removida.")
+      + " · Linha " + (Math.floor(selectedIndex / 9) + 1) + ", coluna " + ((selectedIndex % 9) + 1) + ".";
+    return;
+  }
+
+  const completedRegions = highlightNewlyCompletedRegions(completedBeforeInput);
+  gameStatusElement.textContent = completedRegions.length > 0
+    ? "Região concluída: " + completedRegions.join(", ") + "."
     : value + " inserido na linha " + (Math.floor(selectedIndex / 9) + 1) + ", coluna " + ((selectedIndex % 9) + 1) + ".";
 }
 
@@ -448,7 +576,9 @@ async function startGame() {
     gameStartedAt = game.startedAt;
     initialBoard = game.board;
     gameCompleted = false;
+    clearRegionHighlights();
     difficultyElement.value = game.difficulty;
+    storeSelectedDifficulty();
     restoreBoard(game.board, {});
     storeActiveGame();
     setNotesMode(false);
@@ -483,6 +613,7 @@ async function resumeGame(savedGame) {
   initialBoard = savedGame.initialBoard;
   difficultyElement.value = savedGame.difficulty;
   gameCompleted = false;
+  clearRegionHighlights();
   restoreBoard(progress.board, progress.notes);
   setNotesMode(false);
   setGameControlsEnabled(true);
@@ -518,7 +649,8 @@ async function initializeAuthenticatedGame() {
         }
       }
     }
-    await startGame();
+    setGameControlsEnabled(false);
+    gameStatusElement.textContent = "Escolha a dificuldade e clique em Novo jogo para começar.";
   } catch (error) {
     gameStatusElement.textContent = formatApiError(error);
     setGameControlsEnabled(false);
@@ -674,6 +806,7 @@ function resetGameAfterLogout() {
   notesMode = false;
   cells = Array.from({ length: 81 }, () => ({ value: 0, fixed: false, notes: new Set() }));
   cells.forEach((cell, index) => renderCell(index));
+  clearRegionHighlights();
   updateHighlights();
   timerElement.textContent = "00:00";
   timerElement.dateTime = "PT0S";
@@ -777,6 +910,8 @@ notesButton.addEventListener("click", () => setNotesMode(!notesMode));
 document.getElementById("newGameBtn").addEventListener("click", startGame);
 document.getElementById("sendBtn").addEventListener("click", sendDiagnosticRecord);
 document.getElementById("logoutButton").addEventListener("click", logout);
+document.getElementById("difficultySelect").addEventListener("change", storeSelectedDifficulty);
 
+restoreSelectedDifficulty();
 renderDiscordHeader();
 loadSession();

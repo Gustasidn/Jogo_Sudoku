@@ -58,20 +58,20 @@
           <section class="control-card">
             <h2>Partida</h2>
             <label class="field-label" for="difficultySelect">Dificuldade</label>
-            <select id="difficultySelect" class="control-select">
+            <select id="difficultySelect" class="control-select" aria-describedby="difficultyHint">
               <option value="facil">Fácil</option>
               <option value="medio">Médio</option>
               <option value="dificil">Difícil</option>
             </select>
+            <p class="difficulty-hint" id="difficultyHint">Escolha a dificuldade antes de iniciar uma partida.</p>
             <button class="button button-primary" id="newGameBtn" type="button">Novo jogo</button>
-            <button class="button button-secondary save-progress-button" id="saveProgressBtn" type="button">Salvar progresso</button>
             <div class="timer-detail">
               <span class="status-dot" aria-hidden="true"></span>
               <span id="gameModeLabel">Aguardando autenticação Discord</span>
             </div>
           </section>
 
-          <section class="control-card">
+          <section class="control-card number-control-card" aria-label="Controles rápidos do tabuleiro">
             <h2>Números</h2>
             <div class="number-pad" id="numberPad" aria-label="Inserir número">
               <button class="number-button" type="button" data-number="1" aria-label="Inserir 1">1</button>
@@ -87,6 +87,7 @@
             <div class="action-row">
               <button class="button button-secondary" id="notesBtn" type="button" aria-pressed="false">✎ <span>Notas</span></button>
               <button class="button button-secondary" id="eraseBtn" type="button">⌫ <span>Apagar</span></button>
+              <button class="button button-secondary" id="saveProgressBtn" type="button">Salvar</button>
             </div>
           </section>
 
