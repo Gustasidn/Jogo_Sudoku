@@ -5,6 +5,8 @@ const ACTIVE_DIFFICULTY_KEY = "sudoku.selectedDifficulty";
 const boardElement = document.getElementById("sudokuBoard");
 const timerElement = document.getElementById("gameTimer");
 const gameStatusElement = document.getElementById("gameStatus");
+const victoryPanelElement = document.getElementById("victoryPanel");
+const victoryTimeElement = document.getElementById("victoryTime");
 const difficultyElement = document.getElementById("difficultySelect");
 const notesButton = document.getElementById("notesBtn");
 const cellElements = [];
@@ -429,6 +431,16 @@ function formatTime(totalSeconds) {
   return minutes.toString().padStart(2, "0") + ":" + seconds.toString().padStart(2, "0");
 }
 
+function showVictoryPanel(elapsedSeconds) {
+  victoryTimeElement.textContent = formatTime(elapsedSeconds);
+  victoryTimeElement.dateTime = "PT" + elapsedSeconds + "S";
+  victoryPanelElement.hidden = false;
+}
+
+function hideVictoryPanel() {
+  victoryPanelElement.hidden = true;
+}
+
 function updateTimer() {
   if (!gameStartedAt || gameCompleted) return;
   const elapsed = Math.max(0, Math.floor((Date.now() - Date.parse(gameStartedAt)) / 1000));
@@ -590,6 +602,7 @@ async function startGame() {
       throw new Error("A API retornou dados incompletos para a partida.");
     }
 
+    hideVictoryPanel();
     gameId = game.gameId;
     puzzleId = game.puzzleId;
     gameStartedAt = game.startedAt;
@@ -779,7 +792,8 @@ async function validateGame() {
 
     stopTimer(elapsedSeconds);
     clearStoredGame();
-    gameStatusElement.textContent = "Sudoku validado pelo servidor. Tempo oficial: " + formatTime(elapsedSeconds) + ".";
+    showVictoryPanel(elapsedSeconds);
+    gameStatusElement.textContent = "Sudoku validado pelo servidor.";
     await loadRanking();
   } catch (error) {
     gameStatusElement.textContent = formatApiError(error);
@@ -814,6 +828,7 @@ async function sendDiagnosticRecord() {
 }
 
 function resetGameAfterLogout() {
+  hideVictoryPanel();
   window.clearInterval(timerInterval);
   timerInterval = null;
   gameId = null;
