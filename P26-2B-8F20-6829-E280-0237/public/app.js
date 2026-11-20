@@ -270,8 +270,8 @@ function findConflictingCells() {
         || (Math.floor(row / 3) === Math.floor(otherRow / 3)
           && Math.floor(column / 3) === Math.floor(otherColumn / 3));
       if (!sharesRegion) continue;
-      if (!cells[index].fixed) conflicts.add(index);
-      if (!cells[otherIndex].fixed) conflicts.add(otherIndex);
+      conflicts.add(index);
+      conflicts.add(otherIndex);
     }
   }
   return conflicts;
@@ -279,9 +279,15 @@ function findConflictingCells() {
 
 function getCompletedRegions() {
   const completed = new Set();
+  const expectedValues = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  const conflictingCells = findConflictingCells();
   REGIONS.forEach((region) => {
     const values = region.indices.map((index) => cells[index].value);
-    if (values.every((value) => value > 0) && new Set(values).size === 9) {
+    const isCompleteAndUnique = values.every((value) => value > 0)
+      && new Set(values).size === expectedValues.size
+      && values.every((value) => expectedValues.has(value));
+    const hasConflicts = region.indices.some((index) => conflictingCells.has(index));
+    if (isCompleteAndUnique && !hasConflicts) {
       completed.add(region.id);
     }
   });
@@ -307,6 +313,13 @@ function clearRegionHighlights() {
 
 function highlightNewlyCompletedRegions(previouslyCompleted) {
   const completedRegions = getCompletedRegions();
+  activeRegionHighlights.forEach((indices, regionId) => {
+    if (completedRegions.has(regionId)) return;
+    window.clearTimeout(regionHighlightTimeouts.get(regionId));
+    regionHighlightTimeouts.delete(regionId);
+    activeRegionHighlights.delete(regionId);
+  });
+
   const newlyCompleted = REGIONS.filter((region) => (
     !previouslyCompleted.has(region.id) && completedRegions.has(region.id)
   ));
@@ -322,7 +335,7 @@ function highlightNewlyCompletedRegions(previouslyCompleted) {
     regionHighlightTimeouts.set(region.id, timeout);
   });
 
-  if (newlyCompleted.length > 0) updateRegionHighlights();
+  updateRegionHighlights();
   return newlyCompleted.map((region) => region.label);
 }
 
@@ -488,19 +501,25 @@ function enterValue(value) {
   }
 
   const completedRegions = highlightNewlyCompletedRegions(completedBeforeInput);
-  gameStatusElement.textContent = completedRegions.length > 0
-    ? "Região concluída: " + completedRegions.join(", ") + "."
-    : value + " inserido na linha " + (Math.floor(selectedIndex / 9) + 1) + ", coluna " + ((selectedIndex % 9) + 1) + ".";
+  if (findConflictingCells().has(selectedIndex)) {
+    gameStatusElement.textContent = "Conflito detectado na linha, coluna ou bloco desta célula. O número foi mantido.";
+  } else {
+    gameStatusElement.textContent = completedRegions.length > 0
+      ? "Região concluída: " + completedRegions.join(", ") + "."
+      : value + " inserido na linha " + (Math.floor(selectedIndex / 9) + 1) + ", coluna " + ((selectedIndex % 9) + 1) + ".";
+  }
 }
 
 function eraseCell() {
   const cell = cells[selectedIndex];
   if (!gameId || gameCompleted || !cell || cell.fixed) return;
 
+  const completedBeforeInput = getCompletedRegions();
   cell.value = 0;
   cell.notes.clear();
   renderCell(selectedIndex);
   updateHighlights();
+  highlightNewlyCompletedRegions(completedBeforeInput);
   gameStatusElement.textContent = "Conteúdo removido da célula selecionada.";
 }
 
